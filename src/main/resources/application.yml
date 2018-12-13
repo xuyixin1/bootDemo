@@ -1,0 +1,27 @@
+server:
+  port: 8088
+  tomcat:
+    uri-encoding: UTF-8
+
+spring:
+  datasource:
+    host: 47.101.42.50
+    port: 3306
+    database: coupon
+    url: jdbc:mysql://${spring.datasource.host}:${spring.datasource.port}/${spring.datasource.database}
+    username: root
+    password: 123456
+    DriverClassName: com.mysql.cj.jdbc.Driver
+
+  redis:
+    database: 0
+    host: 47.101.42.50
+    port: 6379
+    jedis:
+      pool:
+        max-active: 100
+        max-wait: -1
+        max-idle: 10
+        min-idle: 10
+    timeout: 1000
+

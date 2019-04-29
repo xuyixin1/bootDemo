@@ -29,5 +29,11 @@ public class Test {
         testService.insert();
     }
 
+    @RequestMapping("/retry")
+    @ResponseBody
+    public void retry(){
+        testService.retry();
+    }
+
 
 }

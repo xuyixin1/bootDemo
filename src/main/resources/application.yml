@@ -1,5 +1,5 @@
 server:
-  port: 8088
+  port: 8089
   tomcat:
     uri-encoding: UTF-8
 
@@ -24,4 +24,7 @@ spring:
         max-idle: 10
         min-idle: 10
     timeout: 1000
+
+  logging:
+    config: classpath:logback.xml
 

@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.alibaba.fastjson.JSONObject;
 import com.example.demo.Util.RedisUtil;
 import com.example.demo.domain.Info;
 import com.example.demo.service.TestService;
@@ -14,8 +15,11 @@ public class Test {
     @Autowired
     private RedisUtil  redisUtil;
 
-    @RequestMapping(value = "/test" ,method = {RequestMethod.POST})
-    public Info test(@RequestParam int id ){
+    @RequestMapping(value = "/test")
+    @ResponseBody
+    public Info test(@RequestBody String body ){
+        JSONObject contentJson = JSONObject.parseObject(body);
+        int id = contentJson.getInteger("id");
         id = id++;
         System.out.print(id);
        Info info =  testService.find();
@@ -24,13 +28,11 @@ public class Test {
     }
 
     @RequestMapping("/insert")
-    @ResponseBody
     public void insert()throws Exception{
         testService.insert();
     }
 
     @RequestMapping("/retry")
-    @ResponseBody
     public void retry(){
         testService.retry();
     }

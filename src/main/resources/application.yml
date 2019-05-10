@@ -13,6 +13,12 @@ spring:
     password: 123456
     DriverClassName: com.mysql.cj.jdbc.Driver
 
+  rabbitmq:
+    host: 106.14.190.167
+    port: 5672
+    username: test
+    password: onlyTest
+
   redis:
     database: 0
     host: 47.101.42.50

@@ -18,6 +18,13 @@ spring:
     port: 5672
     username: test
     password: onlyTest
+    publisher-confirms: true #消息发到交换机确认机制，是否确认回调
+    publisher-returns: true #消息发到交换机确认机制，是否返回回调
+    listener:
+      simple:
+        acknowledge-mode: manual
+      direct:
+        acknowledge-mode: manual
 
   redis:
     database: 0

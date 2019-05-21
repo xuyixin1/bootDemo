@@ -9,7 +9,7 @@ import java.io.IOException;
 
 @Component
 public class topicMessageListner {
-    @RabbitListener(queues="topic.message")
+   // @RabbitListener(queues="topic.message")
     public void process(Message message , Channel channel)throws IOException {
         channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         System.out.println("topic.message:"+ new String(message.getBody()));

@@ -9,6 +9,10 @@ source_base_dir="/opt/springboot/bootDemo"
 target_dir="$source_base_dir/target"
 logs_dir="$prog_dir/logs/demo"
 
+# 下载最新代码
+cd $source_base_dir && git pull origin
+
+git checkout master
 # 打包
 echo ">>> Package code."
 cd $source_base_dir && mvn clean package -Dmaven.test.skip=true

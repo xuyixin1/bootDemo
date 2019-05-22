@@ -47,7 +47,7 @@ echo ">>> Copy latest package."
 cp $target_dir/$prog $prog_dir
 
 # 启动应用
-nohup java -jar -Dspring.profiles.active=dev $prog_dir/$prog >>/dev/null &
+nohup java -jar -Dspring.profiles.active=dev $prog_dir/$prog >/dev/null 2>&1 &
 
 tail -f $logs_dir/`date '+%Y-%m-%d'`/*.log
 

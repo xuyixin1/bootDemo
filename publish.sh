@@ -47,4 +47,6 @@ cp $target_dir/$prog $prog_dir
 # 启动应用
 nohup java -jar -Dspring.profiles.active=dev $prog_dir/$prog >/dev/null 2>&1 &
 
+tail -100  $logs_dir/`date '+%Y-%m-%d'`/info.0.log
+
 echo ">>> Publish done."

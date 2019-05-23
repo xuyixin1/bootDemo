@@ -51,4 +51,4 @@ nohup java -jar -Dspring.profiles.active=dev $prog_dir/$prog >/dev/null 2>&1 &
 
 tail -f $logs_dir/`date '+%Y-%m-%d'`/error.0.log
 
-echo ">>> Publish done."
+echo ">>> Publish done. "

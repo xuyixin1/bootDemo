@@ -16,7 +16,7 @@ import java.util.List;
 
 @Configuration
 public class MyMvcConfiguration extends WebMvcConfigurationSupport {
-    //todo 监控暂不支持fastjson
+    //todo actuatoru监控暂不支持fastjson
 //    @Override
 //    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
 //        super.configureMessageConverters(converters);

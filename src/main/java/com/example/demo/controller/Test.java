@@ -25,7 +25,7 @@ public class Test {
     @PostMapping(value = "/test")
     @ResponseBody
     public Info test(@RequestBody String body ){
-        RestTemplateUtil.getResult("","",Boolean.class);
+       // RestTemplateUtil.getResult("","",Boolean.class);
         JSONObject contentJson = JSONObject.parseObject(body);
         int id = contentJson.getInteger("id");
         id = id++;

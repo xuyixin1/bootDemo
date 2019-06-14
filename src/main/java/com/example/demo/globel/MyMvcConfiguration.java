@@ -1,5 +1,6 @@
 package com.example.demo.globel;
 
+
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.alibaba.fastjson.support.config.FastJsonConfig;
 import com.alibaba.fastjson.support.spring.FastJsonHttpMessageConverter;
@@ -15,21 +16,22 @@ import java.util.List;
 
 @Configuration
 public class MyMvcConfiguration extends WebMvcConfigurationSupport {
-    @Override
-    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
-        super.configureMessageConverters(converters);
-        FastJsonHttpMessageConverter fastJsonHttpMessageConverter = new FastJsonHttpMessageConverter();
-        FastJsonConfig fastJsonConfig = fastJsonHttpMessageConverter.getFastJsonConfig();
-        List<MediaType> fastMediaTypes = new ArrayList();
-        fastMediaTypes.add(MediaType.APPLICATION_JSON_UTF8);
-        fastJsonConfig.setSerializerFeatures(
-                SerializerFeature.DisableCircularReferenceDetect,
-                SerializerFeature.WriteMapNullValue
-        );
-        fastJsonHttpMessageConverter.setSupportedMediaTypes(fastMediaTypes);
-        fastJsonHttpMessageConverter.setFastJsonConfig(fastJsonConfig);
-        converters.add(fastJsonHttpMessageConverter);
-    }
+    //todo 监控暂不支持fastjson
+//    @Override
+//    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
+//        super.configureMessageConverters(converters);
+//        FastJsonHttpMessageConverter fastJsonHttpMessageConverter = new FastJsonHttpMessageConverter();
+//        FastJsonConfig fastJsonConfig = fastJsonHttpMessageConverter.getFastJsonConfig();
+//        List<MediaType> fastMediaTypes = new ArrayList();
+//        fastMediaTypes.add(MediaType.APPLICATION_JSON_UTF8);
+//        fastJsonConfig.setSerializerFeatures(
+//                SerializerFeature.DisableCircularReferenceDetect,
+//                SerializerFeature.WriteMapNullValue
+//        );
+//        fastJsonHttpMessageConverter.setSupportedMediaTypes(fastMediaTypes);
+//        fastJsonHttpMessageConverter.setFastJsonConfig(fastJsonConfig);
+//        converters.add(fastJsonHttpMessageConverter);
+//    }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {

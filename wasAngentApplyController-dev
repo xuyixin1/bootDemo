@@ -1,14 +1,418 @@
-package com.jeeplus.modules.agentsystem.agency.web;
+package com.jeeplus.modules.sys.web;
 
-import java.util.Comparator;
+import com.google.common.collect.Maps;
+import com.jeeplus.common.config.Global;
+import com.jeeplus.common.json.AjaxJson;
+import com.jeeplus.common.security.shiro.session.SessionDAO;
+import com.jeeplus.common.utils.CacheUtils;
+import com.jeeplus.common.utils.CookieUtils;
+import com.jeeplus.common.utils.IdGen;
+import com.jeeplus.common.utils.StringUtils;
+import com.jeeplus.common.web.BaseController;
+import com.jeeplus.modules.agentsystem.agency.entity.WasSysUser;
+import com.jeeplus.modules.agentsystem.agency.service.WasSysUserService;
+import com.jeeplus.modules.sys.dao.UserDao;
+import com.jeeplus.modules.sys.entity.User;
+import com.jeeplus.modules.sys.security.SystemAuthorizingRealm.Principal;
+import com.jeeplus.modules.sys.service.SystemService;
+import com.jeeplus.modules.sys.utils.UserUtils;
+import com.jeeplus.modules.tools.utils.ConfigurationFileHelper;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.authz.UnauthorizedException;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.apache.shiro.session.Session;
+import org.apache.shiro.subject.Subject;
+import org.apache.shiro.web.util.SavedRequest;
+import org.apache.shiro.web.util.WebUtils;
+import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-class WasAgentOrderController$2
-  implements Comparator<String>
+@Controller
+public class LoginController
+  extends BaseController
 {
-  WasAgentOrderController$2(WasAgentOrderController paramWasAgentOrderController) {}
+  @Autowired
+  private SessionDAO sessionDAO;
+  @Autowired
+  private UserDao userDao;
+  @Autowired
+  private WasSysUserService wasSysUserService;
 
-  public int compare(String o1, String o2)
+  @RequestMapping({"${adminPath}/login"})
+  public String login(HttpServletRequest request, HttpServletResponse response, Model model, WasSysUser wasSysUser)
+    throws IOException
   {
-    return o1.compareTo(o2);
+    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
+    if (this.logger.isDebugEnabled()) {
+      this.logger.debug("login, active session size: {}", Integer.valueOf(this.sessionDAO.getActiveSessions(false).size()));
+    }
+    boolean isGlobal = "true".equals(Global.getConfig("notAllowRefreshIndex"));
+    if (isGlobal) {
+      CookieUtils.setCookie(response, "LOGINED", "false");
+    }
+    if ((principal != null) && (!principal.isMobileLogin())) {
+      return "redirect:" + this.adminPath;
+    }
+    SavedRequest savedRequest = WebUtils.getSavedRequest(request);
+    if (savedRequest != null)
+    {
+      String queryStr = savedRequest.getQueryString();
+      boolean exitsed = (queryStr != null) && ((queryStr.contains("__ajax")) || (queryStr.contains("mobileLogin")));
+      if (exitsed)
+      {
+        AjaxJson j = new AjaxJson();
+        j.setSuccess(false);
+        j.setErrorCode("0");
+        j.setMsg("没有登录!");
+        return renderString(response, j);
+      }
+    }
+    return "redirect:" + this.backPath + "/a/login";
+  }
+
+  @RequestMapping({"${adminPath}/changePassword"})
+  public String changePassword(HttpServletRequest request, HttpServletResponse response, Model model)
+    throws IOException
+  {
+    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
+    String login_name = null;
+    if ((principal != null) && (!principal.isMobileLogin()))
+    {
+      login_name = principal.getLoginName().toString();
+      UserUtils.getSubject().logout();
+    }
+    model.addAttribute("login_name", login_name);
+    return "modules/sys/sysChangePassword";
+  }
+
+  @RequestMapping({"${adminPath}/backLogin"})
+  public String backLogin(HttpServletRequest request, HttpServletResponse response)
+  {
+    return "modules/sys/sysLoginS";
+  }
+
+  @ResponseBody
+  @RequestMapping({"${adminPath}/affirmChange"})
+  public String affirmSave(HttpServletRequest request, HttpServletResponse response, RedirectAttributes redirectAttributes)
+  {
+    String loginName = request.getParameter("loginName");
+    String oldPassword = request.getParameter("oldPassword");
+    String password = request.getParameter("changeNewPassword");
+    User user = (User)this.userDao.findUniqueByProperty("login_name", loginName);
+    UserUtils.clearCache(user);
+    Boolean result = Boolean.valueOf(SystemService.validatePassword(oldPassword, user.getPassword()));
+    if (!result.booleanValue()) {
+      return "validateFailure";
+    }
+    user.setPassword(SystemService.entryptPassword(password));
+    user.setUpdateDate(new Date());
+    int num = -1;
+    num = this.userDao.updatePasswordById(user);
+    if (num != -1)
+    {
+      UserUtils.getSubject().logout();
+      return "OK";
+    }
+    return "error";
+  }
+
+  @RequestMapping(value={"${adminPath}/login"}, method={org.springframework.web.bind.annotation.RequestMethod.POST})
+  public String loginFail(HttpServletRequest request, HttpServletResponse response, Model model, WasSysUser wasSysUser)
+  {
+    UserUtils.getSubject().logout();
+    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
+    if (principal != null) {
+      return "redirect:" + this.adminPath;
+    }
+    String username = WebUtils.getCleanParam(request, "username");
+    boolean rememberMe = WebUtils.isTrue(request, "rememberMe");
+    boolean mobile = WebUtils.isTrue(request, "mobileLogin");
+    String exception = (String)request.getAttribute("shiroLoginFailure");
+    String message = (String)request.getAttribute("message");
+
+
+
+
+    model.addAttribute("username", username);
+    model.addAttribute("rememberMe", Boolean.valueOf(rememberMe));
+    model.addAttribute("mobileLogin", Boolean.valueOf(mobile));
+    model.addAttribute("shiroLoginFailure", exception);
+    model.addAttribute("message", message);
+    if (this.logger.isDebugEnabled()) {
+      this.logger.debug("login fail, active session size: {}, message: {}, exception: {}", new Object[] {
+        Integer.valueOf(this.sessionDAO.getActiveSessions(false).size()), message, exception });
+    }
+    if (!UnauthorizedException.class.getName().equals(exception)) {
+      model.addAttribute("isValidateCodeLogin", Boolean.valueOf(isValidateCodeLogin(username, true, false)));
+    }
+    request.getSession().setAttribute("validateCode", IdGen.uuid());
+    if (mobile)
+    {
+      AjaxJson j = new AjaxJson();
+      j.setSuccess(false);
+      j.setMsg(message);
+      j.put("username", username);
+      j.put("name", "");
+      j.put("mobileLogin", Boolean.valueOf(mobile));
+      j.put("JSESSIONID", "");
+      return renderString(response, j.getJsonStr());
+    }
+    return "modules/sys/sysLoginS";
+  }
+
+  @RequestMapping(value={"${adminPath}/logout"}, method={org.springframework.web.bind.annotation.RequestMethod.GET})
+  public String logout(HttpServletRequest request, HttpServletResponse response, Model model)
+    throws IOException
+  {
+    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
+    if (principal != null) {
+      UserUtils.getSubject().logout();
+    }
+    String ajax = request.getParameter("__ajax");
+    if (ajax != null)
+    {
+      model.addAttribute("success", "1");
+      model.addAttribute("msg", "退出成功");
+      return renderString(response, model);
+    }
+    return "redirect:" + this.backPath + "/a/login";
+  }
+
+  @ResponseBody
+  @RequestMapping({"logOut"})
+  public void logOut(HttpServletRequest request)
+  {
+    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
+    if (principal != null) {
+      UserUtils.getSubject().logout();
+    }
+  }
+
+  @RequestMapping({"${adminPath}/checkJump"})
+  public String checkJump(HttpServletRequest request, HttpServletResponse response)
+  {
+    return "modules/agentsystem/agency/wasAgentLookUp";
+  }
+
+  public static int compare_date(String DATE1, String DATE2)
+  {
+    DateFormat df = new SimpleDateFormat("yyyy-MM-dd hh:mm");
+    try
+    {
+      Date dt1 = df.parse(DATE1);
+      Date dt2 = df.parse(DATE2);
+      if (dt1.getTime() > dt2.getTime()) {
+        return 1;
+      }
+      if (dt1.getTime() < dt2.getTime()) {
+        return -1;
+      }
+      return 0;
+    }
+    catch (Exception exception)
+    {
+      exception.printStackTrace();
+    }
+    return 0;
+  }
+
+  @RequiresPermissions({"user"})
+  @RequestMapping({"${adminPath}"})
+  public String index(HttpServletRequest request, HttpServletResponse response, WasSysUser wasSysUser, Model model)
+  {
+    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
+    String login_name = principal.getLoginName().toString();
+    wasSysUser.setLogin_name(login_name);
+
+
+    Session sessionTwo = UserUtils.getSession();
+    String activeUserId = (String)sessionTwo.getAttribute("activeUserId");
+    System.err.println(activeUserId);
+    System.err.println(activeUserId);
+    System.err.println(activeUserId);
+    System.err.println(activeUserId);
+    System.err.println(activeUserId);
+
+
+    List<WasSysUser> list = this.wasSysUserService.agentLookUp(wasSysUser);
+    if (!"admin".equals(login_name))
+    {
+      SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd hh:mm");
+      Date dateO = new Date();
+      Date startDateO = ((WasSysUser)list.get(0)).getStartDate();
+      Date endDateO = ((WasSysUser)list.get(0)).getEndDate();
+      Integer state = ((WasSysUser)list.get(0)).getState();
+      String del_flag = ((WasSysUser)list.get(0)).getDelFlag();
+      String remarks = ((WasSysUser)list.get(0)).getRemarks();
+      if ("0".equals(del_flag))
+      {
+        if (state.intValue() == 0)
+        {
+          model.addAttribute("stateFlag", "1");
+          model.addAttribute("resultFlag", "账号已经冻结");
+          model.addAttribute("resultFlagReason", remarks);
+          Subject subject = SecurityUtils.getSubject();
+          subject.logout();
+          return "modules/sys/sysLoginS";
+        }
+        boolean stateApply = state.intValue() == 2;
+        if (stateApply)
+        {
+          model.addAttribute("resultFlag", "账号在申请中！");
+          Subject subject = SecurityUtils.getSubject();
+          subject.logout();
+          return "modules/sys/sysLoginS";
+        }
+        boolean stateReject = state.intValue() == 3;
+        if (stateReject)
+        {
+          model.addAttribute("stateFlag", "1");
+          model.addAttribute("resultFlagReason", remarks);
+          model.addAttribute("resultFlag", "账号已经驳回！");
+          Subject subject = SecurityUtils.getSubject();
+          subject.logout();
+          return "modules/sys/sysLoginS";
+        }
+        boolean stateNormal = state.intValue() == 1;
+        if ((stateNormal) &&
+          (startDateO != null) && (endDateO != null))
+        {
+          String date = FORMAT.format(dateO);
+          String startDate = FORMAT.format(startDateO);
+          String endDate = FORMAT.format(endDateO);
+          int resultS = compare_date(date, startDate);
+          int resultE = compare_date(endDate, date);
+          if (resultS < 0)
+          {
+            model.addAttribute("resultFlag", "账号还未开始！");
+            Subject subject = SecurityUtils.getSubject();
+            subject.logout();
+            return "modules/sys/sysLoginS";
+          }
+          if (resultE < 0)
+          {
+            model.addAttribute("resultFlag", "账号已过期！");
+            Subject subject = SecurityUtils.getSubject();
+            subject.logout();
+            return "modules/sys/sysLoginS";
+          }
+        }
+      }
+      else
+      {
+        model.addAttribute("resultFlag", "账号已被删除！");
+        Subject subject = SecurityUtils.getSubject();
+        subject.logout();
+        return "modules/sys/sysLoginS";
+      }
+    }
+    isValidateCodeLogin(principal.getLoginName(), false, true);
+    if (this.logger.isDebugEnabled()) {
+      this.logger.debug("show index, active session size: {}", Integer.valueOf(this.sessionDAO.getActiveSessions(false).size()));
+    }
+    boolean isGlobal = "true".equals(Global.getConfig("notAllowRefreshIndex"));
+    if (isGlobal)
+    {
+      String logined = CookieUtils.getCookie(request, "LOGINED");
+      boolean isLogin = (StringUtils.isBlank(logined)) || ("false".equals(logined));
+      boolean isLogined = StringUtils.equals(logined, "true");
+      if (isLogin)
+      {
+        CookieUtils.setCookie(response, "LOGINED", "true");
+      }
+      else if (isLogined)
+      {
+        UserUtils.getSubject().logout();
+        return "redirect:" + this.adminPath + "/login";
+      }
+    }
+    if (principal.isMobileLogin())
+    {
+      boolean loginSuccess = request.getParameter("login") != null;
+      boolean indexSuccess = request.getParameter("index") != null;
+      if (loginSuccess) {
+        return renderString(response, principal);
+      }
+      if (indexSuccess) {
+        return "modules/agentSystem/index";
+      }
+      return "redirect:" + this.adminPath + "/login";
+    }
+    String fileUrl = ConfigurationFileHelper.getFileUrl();
+    String savePath = ConfigurationFileHelper.getSavePath();
+
+    String loginName = principal.getLoginName();
+
+    String photo = "";
+    if ((((WasSysUser)list.get(0)).getPhoto() != null) && (!"".equals(((WasSysUser)list.get(0)).getPhoto().trim()))) {
+      photo = fileUrl + ((WasSysUser)list.get(0)).getPhoto();
+    }
+    Subject subject = SecurityUtils.getSubject();
+    Session session = subject.getSession();
+    session.setAttribute("vicmobAgentSystemUserName", principal.getLoginName());
+    session.setAttribute("vicmobAgentSystemUserPhoto", photo);
+    session.setAttribute("vicmobAgentSystemFileUrl", fileUrl);
+    session.setAttribute("vicmobAgentSystemSavePath", savePath);
+    session.setAttribute("vicmobAgentSystemLoginName", loginName);
+    session.setAttribute("activeUserId", activeUserId);
+    return "modules/agentsystem/index";
+  }
+
+  @RequestMapping({"/theme/{theme}"})
+  public String getThemeInCookie(@PathVariable String theme, HttpServletRequest request, HttpServletResponse response)
+  {
+    if (StringUtils.isNotBlank(theme)) {
+      CookieUtils.setCookie(response, "theme", theme);
+    } else {
+      theme = CookieUtils.getCookie(request, "theme");
+    }
+    return "redirect:" + request.getParameter("url");
+  }
+
+  public static boolean isValidateCodeLogin(String useruame, boolean isFail, boolean clean)
+  {
+    Map<String, Integer> loginFailMap = (Map)CacheUtils.get("loginFailMap");
+    if (loginFailMap == null)
+    {
+      loginFailMap = Maps.newHashMap();
+      CacheUtils.put("loginFailMap", loginFailMap);
+    }
+    Integer loginFailNum = (Integer)loginFailMap.get(useruame);
+    if (loginFailNum == null) {
+      loginFailNum = Integer.valueOf(0);
+    }
+    if (isFail)
+    {
+      loginFailNum = Integer.valueOf(loginFailNum.intValue() + 1);
+      loginFailMap.put(useruame, loginFailNum);
+    }
+    if (clean) {
+      loginFailMap.remove(useruame);
+    }
+    return loginFailNum.intValue() >= 3;
+  }
+
+  @RequestMapping({"${adminPath}/home"})
+  public String home(HttpServletRequest request, HttpServletResponse response, Model model)
+    throws IOException
+  {
+    return "modules/sys/sysHome";
   }
 }

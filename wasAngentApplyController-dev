@@ -1,0 +1,18 @@
+package com.jeeplus.modules.agentsystem.agency.web;
+
+import com.jeeplus.modules.agentsystem.sysdata.entity.WasSalesPolicy;
+import java.util.Comparator;
+
+class WasAgentApplyController$1
+  implements Comparator<WasSalesPolicy>
+{
+  WasAgentApplyController$1(WasAgentApplyController paramWasAgentApplyController) {}
+
+  public int compare(WasSalesPolicy o1, WasSalesPolicy o2)
+  {
+    if (o2.getSort() != o1.getSort()) {
+      return o1.getSort().compareTo(o2.getSort());
+    }
+    return o1.getSalesPolicyId().compareTo(o2.getSalesPolicyId());
+  }
+}

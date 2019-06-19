@@ -38,12 +38,14 @@ spring:
         min-idle: 10
     timeout: 1000
 
-  logging:
-    config: classpath:logback.xml
+logging:
+  config: classpath:logback.xml
+  #mybatis打印sql
+  level:
+    com.example.demo.dao: debug
 
 
-
-
-
-
+mybatis:
+  config-location: classpath:mybatis-config.xml
+  mapper-locations: classpath:mapper/*.xml
 

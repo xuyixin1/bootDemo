@@ -53,16 +53,6 @@ public class DataSourceConfig {
         return new DataSourceTransactionManager(dataSource);
     }
 
-    @Bean
-    @Order(0)
-    public SqlSessionFactory testSqlSessionFactory(DataSource dataSource) throws Exception {
-        SqlSessionFactoryBean bean = new SqlSessionFactoryBean();
-        bean.setDataSource(dataSource);
-        bean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath*:mapper/*.xml"));
-        bean.setConfigLocation(new PathMatchingResourcePatternResolver().getResource("classpath:mybatis-config.xml"));
-        return bean.getObject();
-    }
-
     //配置web监控
     /*
 

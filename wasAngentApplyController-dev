@@ -1,18 +1,14 @@
 package com.jeeplus.modules.agentsystem.agency.web;
 
-import com.jeeplus.modules.agentsystem.sysdata.entity.WasSalesPolicy;
 import java.util.Comparator;
 
-class WasAgentOrderController$1
-  implements Comparator<WasSalesPolicy>
+class WasAgentOrderController$2
+  implements Comparator<String>
 {
-  WasAgentOrderController$1(WasAgentOrderController paramWasAgentOrderController) {}
+  WasAgentOrderController$2(WasAgentOrderController paramWasAgentOrderController) {}
 
-  public int compare(WasSalesPolicy o1, WasSalesPolicy o2)
+  public int compare(String o1, String o2)
   {
-    if (o2.getSort() != o1.getSort()) {
-      return o1.getSort().compareTo(o2.getSort());
-    }
-    return o2.getSalesPolicyId().compareTo(o1.getSalesPolicyId());
+    return o1.compareTo(o2);
   }
 }

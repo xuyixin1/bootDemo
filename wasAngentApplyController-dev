@@ -1,258 +1,950 @@
-package com.jeeplus.modules.admin.controller;
+package org.apache.ibatis.session;
 
-import com.jeeplus.common.persistence.Page;
-import com.jeeplus.common.utils.DateUtils;
-import com.jeeplus.common.web.BaseController;
-import com.jeeplus.modules.admin.common.ServerResponse;
-import com.jeeplus.modules.admin.entity.SysAdminUser;
-import com.jeeplus.modules.admin.service.AccountManagementService;
-import com.jeeplus.modules.admin.service.SysAdminUserService;
-import com.jeeplus.modules.sys.interceptor.AdminAuthonInterceptor;
-import com.jeeplus.modules.sys.utils.MySqlUtils;
-import java.io.PrintStream;
-import java.util.Date;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
+import org.apache.ibatis.binding.MapperRegistry;
+import org.apache.ibatis.builder.CacheRefResolver;
+import org.apache.ibatis.builder.ResultMapResolver;
+import org.apache.ibatis.builder.annotation.MethodResolver;
+import org.apache.ibatis.builder.xml.XMLStatementBuilder;
+import org.apache.ibatis.cache.Cache;
+import org.apache.ibatis.cache.decorators.FifoCache;
+import org.apache.ibatis.cache.decorators.LruCache;
+import org.apache.ibatis.cache.decorators.SoftCache;
+import org.apache.ibatis.cache.decorators.WeakCache;
+import org.apache.ibatis.cache.impl.PerpetualCache;
+import org.apache.ibatis.datasource.jndi.JndiDataSourceFactory;
+import org.apache.ibatis.datasource.pooled.PooledDataSourceFactory;
+import org.apache.ibatis.datasource.unpooled.UnpooledDataSourceFactory;
+import org.apache.ibatis.executor.BatchExecutor;
+import org.apache.ibatis.executor.CachingExecutor;
+import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.executor.ReuseExecutor;
+import org.apache.ibatis.executor.SimpleExecutor;
+import org.apache.ibatis.executor.keygen.KeyGenerator;
+import org.apache.ibatis.executor.loader.ProxyFactory;
+import org.apache.ibatis.executor.loader.cglib.CglibProxyFactory;
+import org.apache.ibatis.executor.loader.javassist.JavassistProxyFactory;
+import org.apache.ibatis.executor.parameter.ParameterHandler;
+import org.apache.ibatis.executor.resultset.DefaultResultSetHandler;
+import org.apache.ibatis.executor.resultset.ResultSetHandler;
+import org.apache.ibatis.executor.statement.RoutingStatementHandler;
+import org.apache.ibatis.executor.statement.StatementHandler;
+import org.apache.ibatis.logging.Log;
+import org.apache.ibatis.logging.LogFactory;
+import org.apache.ibatis.logging.commons.JakartaCommonsLoggingImpl;
+import org.apache.ibatis.logging.jdk14.Jdk14LoggingImpl;
+import org.apache.ibatis.logging.log4j.Log4jImpl;
+import org.apache.ibatis.logging.log4j2.Log4j2Impl;
+import org.apache.ibatis.logging.nologging.NoLoggingImpl;
+import org.apache.ibatis.logging.slf4j.Slf4jImpl;
+import org.apache.ibatis.logging.stdout.StdOutImpl;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.mapping.Discriminator;
+import org.apache.ibatis.mapping.Environment;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.mapping.ParameterMap;
+import org.apache.ibatis.mapping.ResultMap;
+import org.apache.ibatis.mapping.VendorDatabaseIdProvider;
+import org.apache.ibatis.parsing.XNode;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.InterceptorChain;
+import org.apache.ibatis.reflection.MetaObject;
+import org.apache.ibatis.reflection.factory.DefaultObjectFactory;
+import org.apache.ibatis.reflection.factory.ObjectFactory;
+import org.apache.ibatis.reflection.wrapper.DefaultObjectWrapperFactory;
+import org.apache.ibatis.reflection.wrapper.ObjectWrapperFactory;
+import org.apache.ibatis.scripting.LanguageDriver;
+import org.apache.ibatis.scripting.LanguageDriverRegistry;
+import org.apache.ibatis.scripting.defaults.RawLanguageDriver;
+import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
+import org.apache.ibatis.thread.Runnable;
+import org.apache.ibatis.transaction.Transaction;
+import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
+import org.apache.ibatis.transaction.managed.ManagedTransactionFactory;
+import org.apache.ibatis.type.JdbcType;
+import org.apache.ibatis.type.TypeAliasRegistry;
+import org.apache.ibatis.type.TypeHandlerRegistry;
+import org.apache.log4j.Logger;
 
-@Controller
-@RequestMapping({"/admin/user"})
-public class AccountManagementController
-  extends BaseController
+public class Configuration
 {
-  @Autowired
-  private AccountManagementService accountManagementService;
-  @Autowired
-  private SysAdminUserService sysAdminUserService;
+  protected Environment environment;
+  protected boolean safeRowBoundsEnabled = false;
+  protected boolean safeResultHandlerEnabled = true;
+  protected boolean mapUnderscoreToCamelCase = false;
+  protected boolean aggressiveLazyLoading = true;
+  protected boolean multipleResultSetsEnabled = true;
+  protected boolean useGeneratedKeys = false;
+  protected boolean useColumnLabel = true;
+  protected boolean cacheEnabled = true;
+  protected boolean callSettersOnNulls = false;
+  protected String logPrefix;
+  protected Class<? extends Log> logImpl;
+  protected LocalCacheScope localCacheScope = LocalCacheScope.SESSION;
+  protected JdbcType jdbcTypeForNull = JdbcType.OTHER;
+  protected Set<String> lazyLoadTriggerMethods = new HashSet(
+    Arrays.asList(new String[] { "equals", "clone", "hashCode",
+    "toString" }));
+  protected Integer defaultStatementTimeout;
+  protected ExecutorType defaultExecutorType = ExecutorType.SIMPLE;
+  protected AutoMappingBehavior autoMappingBehavior = AutoMappingBehavior.PARTIAL;
+  protected Properties variables = new Properties();
+  protected ObjectFactory objectFactory = new DefaultObjectFactory();
+  protected ObjectWrapperFactory objectWrapperFactory = new DefaultObjectWrapperFactory();
+  protected MapperRegistry mapperRegistry = new MapperRegistry(this);
+  protected boolean lazyLoadingEnabled = false;
+  protected ProxyFactory proxyFactory;
+  protected String databaseId;
+  protected Class<?> configurationFactory;
+  protected final InterceptorChain interceptorChain = new InterceptorChain();
+  protected final TypeHandlerRegistry typeHandlerRegistry = new TypeHandlerRegistry();
+  protected final TypeAliasRegistry typeAliasRegistry = new TypeAliasRegistry();
+  protected final LanguageDriverRegistry languageRegistry = new LanguageDriverRegistry();
+  protected final Map<String, MappedStatement> mappedStatements = new StrictMap(
+    "Mapped Statements collection");
+  protected final Map<String, Cache> caches = new StrictMap(
+    "Caches collection");
+  protected final Map<String, ResultMap> resultMaps = new StrictMap(
+    "Result Maps collection");
+  protected final Map<String, ParameterMap> parameterMaps = new StrictMap(
+    "Parameter Maps collection");
+  protected final Map<String, KeyGenerator> keyGenerators = new StrictMap(
+    "Key Generators collection");
+  protected final Set<String> loadedResources = new HashSet();
+  protected final Map<String, XNode> sqlFragments = new StrictMap(
+    "XML fragments parsed from previous mappers");
+  protected final Collection<XMLStatementBuilder> incompleteStatements = new LinkedList();
+  protected final Collection<CacheRefResolver> incompleteCacheRefs = new LinkedList();
+  protected final Collection<ResultMapResolver> incompleteResultMaps = new LinkedList();
+  protected final Collection<MethodResolver> incompleteMethods = new LinkedList();
+  protected final Map<String, String> cacheRefMap = new HashMap();
 
-  @RequestMapping({"/jumpLeftMenu"})
-  public String jumpLeftMenu(HttpServletRequest request, HttpServletResponse response, Model model)
+  public Configuration(Environment environment)
   {
-    HttpSession session = request.getSession();
-
-    SysAdminUser sysAdminUser = (SysAdminUser)session.getAttribute("currentUser");
-    model.addAttribute("sysAdminUser", sysAdminUser);
-    return "modules/admin/accountManage";
+    this();
+    this.environment = environment;
   }
 
-  @RequestMapping({"/jump"})
-  public String jump(HttpServletRequest request, HttpServletResponse response, Model model)
+  public Configuration()
   {
-    return "modules/admin/ProbationerAccountManagementList";
+    this.typeAliasRegistry.registerAlias("JDBC", JdbcTransactionFactory.class);
+    this.typeAliasRegistry.registerAlias("MANAGED",
+      ManagedTransactionFactory.class);
+
+    this.typeAliasRegistry.registerAlias("JNDI", JndiDataSourceFactory.class);
+    this.typeAliasRegistry
+      .registerAlias("POOLED", PooledDataSourceFactory.class);
+    this.typeAliasRegistry.registerAlias("UNPOOLED",
+      UnpooledDataSourceFactory.class);
+
+    this.typeAliasRegistry.registerAlias("PERPETUAL", PerpetualCache.class);
+    this.typeAliasRegistry.registerAlias("FIFO", FifoCache.class);
+    this.typeAliasRegistry.registerAlias("LRU", LruCache.class);
+    this.typeAliasRegistry.registerAlias("SOFT", SoftCache.class);
+    this.typeAliasRegistry.registerAlias("WEAK", WeakCache.class);
+
+    this.typeAliasRegistry.registerAlias("DB_VENDOR",
+      VendorDatabaseIdProvider.class);
+
+    this.typeAliasRegistry.registerAlias("XML", XMLLanguageDriver.class);
+    this.typeAliasRegistry.registerAlias("RAW", RawLanguageDriver.class);
+
+    this.typeAliasRegistry.registerAlias("SLF4J", Slf4jImpl.class);
+    this.typeAliasRegistry.registerAlias("COMMONS_LOGGING",
+      JakartaCommonsLoggingImpl.class);
+    this.typeAliasRegistry.registerAlias("LOG4J", Log4jImpl.class);
+    this.typeAliasRegistry.registerAlias("LOG4J2", Log4j2Impl.class);
+    this.typeAliasRegistry.registerAlias("JDK_LOGGING", Jdk14LoggingImpl.class);
+    this.typeAliasRegistry.registerAlias("STDOUT_LOGGING", StdOutImpl.class);
+    this.typeAliasRegistry.registerAlias("NO_LOGGING", NoLoggingImpl.class);
+
+    this.typeAliasRegistry.registerAlias("CGLIB", CglibProxyFactory.class);
+    this.typeAliasRegistry.registerAlias("JAVASSIST",
+      JavassistProxyFactory.class);
+
+    this.languageRegistry.setDefaultDriverClass(XMLLanguageDriver.class);
+    this.languageRegistry.register(RawLanguageDriver.class);
   }
 
-  @RequestMapping({"/jumpPartner"})
-  public String jumpPartner(HttpServletRequest request, HttpServletResponse response, Model model)
+  public String getLogPrefix()
   {
-    return "modules/admin/PartnerAccountManagementList";
+    return this.logPrefix;
   }
 
-  @RequestMapping({"/jumpAccount"})
-  public String jumpAccount(HttpServletRequest request, HttpServletResponse response, Model model)
+  public void setLogPrefix(String logPrefix)
   {
-    return "modules/admin/AccountManagementList";
+    this.logPrefix = logPrefix;
   }
 
-  @RequestMapping({"findAllTrialAccount"})
-  @ResponseBody
-  public ServerResponse findAllTrialAccount(HttpServletRequest request, HttpServletResponse response)
+  public Class<? extends Log> getLogImpl()
   {
-    String SearchCondition = request.getParameter("SearchCondition").trim();
-    String start = request.getParameter("SearchStartTime");
-    String SearchStartTime = null;
-    String end = request.getParameter("SearchEndTime");
-    String SearchEndTime = null;
-    if ((start == null) || ("".equals(start))) {
-      SearchStartTime = "1970-01-01 00:00:00";
-    } else {
-      SearchStartTime = start + " 00:00:00";
-    }
-    if ((end == null) || ("".equals(end)))
+    return this.logImpl;
+  }
+
+  public void setLogImpl(Class<?> logImpl)
+  {
+    if (logImpl != null)
     {
-      Date date = new Date();
-      SearchEndTime = DateUtils.formatDate(date, new Object[] { "yyyy-MM-dd" });
-      SearchEndTime = SearchEndTime + " 23:59:59";
+      this.logImpl = logImpl;
+      LogFactory.useCustomLogging(this.logImpl);
+    }
+  }
+
+  public boolean isCallSettersOnNulls()
+  {
+    return this.callSettersOnNulls;
+  }
+
+  public void setCallSettersOnNulls(boolean callSettersOnNulls)
+  {
+    this.callSettersOnNulls = callSettersOnNulls;
+  }
+
+  public String getDatabaseId()
+  {
+    return this.databaseId;
+  }
+
+  public void setDatabaseId(String databaseId)
+  {
+    this.databaseId = databaseId;
+  }
+
+  public Class<?> getConfigurationFactory()
+  {
+    return this.configurationFactory;
+  }
+
+  public void setConfigurationFactory(Class<?> configurationFactory)
+  {
+    this.configurationFactory = configurationFactory;
+  }
+
+  public boolean isSafeResultHandlerEnabled()
+  {
+    return this.safeResultHandlerEnabled;
+  }
+
+  public void setSafeResultHandlerEnabled(boolean safeResultHandlerEnabled)
+  {
+    this.safeResultHandlerEnabled = safeResultHandlerEnabled;
+  }
+
+  public boolean isSafeRowBoundsEnabled()
+  {
+    return this.safeRowBoundsEnabled;
+  }
+
+  public void setSafeRowBoundsEnabled(boolean safeRowBoundsEnabled)
+  {
+    this.safeRowBoundsEnabled = safeRowBoundsEnabled;
+  }
+
+  public boolean isMapUnderscoreToCamelCase()
+  {
+    return this.mapUnderscoreToCamelCase;
+  }
+
+  public void setMapUnderscoreToCamelCase(boolean mapUnderscoreToCamelCase)
+  {
+    this.mapUnderscoreToCamelCase = mapUnderscoreToCamelCase;
+  }
+
+  public void addLoadedResource(String resource)
+  {
+    this.loadedResources.add(resource);
+  }
+
+  public boolean isResourceLoaded(String resource)
+  {
+    return this.loadedResources.contains(resource);
+  }
+
+  public Environment getEnvironment()
+  {
+    return this.environment;
+  }
+
+  public void setEnvironment(Environment environment)
+  {
+    this.environment = environment;
+  }
+
+  public AutoMappingBehavior getAutoMappingBehavior()
+  {
+    return this.autoMappingBehavior;
+  }
+
+  public void setAutoMappingBehavior(AutoMappingBehavior autoMappingBehavior)
+  {
+    this.autoMappingBehavior = autoMappingBehavior;
+  }
+
+  public boolean isLazyLoadingEnabled()
+  {
+    return this.lazyLoadingEnabled;
+  }
+
+  public void setLazyLoadingEnabled(boolean lazyLoadingEnabled)
+  {
+    this.lazyLoadingEnabled = lazyLoadingEnabled;
+  }
+
+  public ProxyFactory getProxyFactory()
+  {
+    if (this.proxyFactory == null) {
+      this.proxyFactory = new CglibProxyFactory();
+    }
+    return this.proxyFactory;
+  }
+
+  public void setProxyFactory(ProxyFactory proxyFactory)
+  {
+    this.proxyFactory = proxyFactory;
+  }
+
+  public boolean isAggressiveLazyLoading()
+  {
+    return this.aggressiveLazyLoading;
+  }
+
+  public void setAggressiveLazyLoading(boolean aggressiveLazyLoading)
+  {
+    this.aggressiveLazyLoading = aggressiveLazyLoading;
+  }
+
+  public boolean isMultipleResultSetsEnabled()
+  {
+    return this.multipleResultSetsEnabled;
+  }
+
+  public void setMultipleResultSetsEnabled(boolean multipleResultSetsEnabled)
+  {
+    this.multipleResultSetsEnabled = multipleResultSetsEnabled;
+  }
+
+  public Set<String> getLazyLoadTriggerMethods()
+  {
+    return this.lazyLoadTriggerMethods;
+  }
+
+  public void setLazyLoadTriggerMethods(Set<String> lazyLoadTriggerMethods)
+  {
+    this.lazyLoadTriggerMethods = lazyLoadTriggerMethods;
+  }
+
+  public boolean isUseGeneratedKeys()
+  {
+    return this.useGeneratedKeys;
+  }
+
+  public void setUseGeneratedKeys(boolean useGeneratedKeys)
+  {
+    this.useGeneratedKeys = useGeneratedKeys;
+  }
+
+  public ExecutorType getDefaultExecutorType()
+  {
+    return this.defaultExecutorType;
+  }
+
+  public void setDefaultExecutorType(ExecutorType defaultExecutorType)
+  {
+    this.defaultExecutorType = defaultExecutorType;
+  }
+
+  public boolean isCacheEnabled()
+  {
+    return this.cacheEnabled;
+  }
+
+  public void setCacheEnabled(boolean cacheEnabled)
+  {
+    this.cacheEnabled = cacheEnabled;
+  }
+
+  public Integer getDefaultStatementTimeout()
+  {
+    return this.defaultStatementTimeout;
+  }
+
+  public void setDefaultStatementTimeout(Integer defaultStatementTimeout)
+  {
+    this.defaultStatementTimeout = defaultStatementTimeout;
+  }
+
+  public boolean isUseColumnLabel()
+  {
+    return this.useColumnLabel;
+  }
+
+  public void setUseColumnLabel(boolean useColumnLabel)
+  {
+    this.useColumnLabel = useColumnLabel;
+  }
+
+  public LocalCacheScope getLocalCacheScope()
+  {
+    return this.localCacheScope;
+  }
+
+  public void setLocalCacheScope(LocalCacheScope localCacheScope)
+  {
+    this.localCacheScope = localCacheScope;
+  }
+
+  public JdbcType getJdbcTypeForNull()
+  {
+    return this.jdbcTypeForNull;
+  }
+
+  public void setJdbcTypeForNull(JdbcType jdbcTypeForNull)
+  {
+    this.jdbcTypeForNull = jdbcTypeForNull;
+  }
+
+  public Properties getVariables()
+  {
+    return this.variables;
+  }
+
+  public void setVariables(Properties variables)
+  {
+    this.variables = variables;
+  }
+
+  public TypeHandlerRegistry getTypeHandlerRegistry()
+  {
+    return this.typeHandlerRegistry;
+  }
+
+  public TypeAliasRegistry getTypeAliasRegistry()
+  {
+    return this.typeAliasRegistry;
+  }
+
+  public MapperRegistry getMapperRegistry()
+  {
+    return this.mapperRegistry;
+  }
+
+  public ObjectFactory getObjectFactory()
+  {
+    return this.objectFactory;
+  }
+
+  public void setObjectFactory(ObjectFactory objectFactory)
+  {
+    this.objectFactory = objectFactory;
+  }
+
+  public ObjectWrapperFactory getObjectWrapperFactory()
+  {
+    return this.objectWrapperFactory;
+  }
+
+  public void setObjectWrapperFactory(ObjectWrapperFactory objectWrapperFactory)
+  {
+    this.objectWrapperFactory = objectWrapperFactory;
+  }
+
+  public List<Interceptor> getInterceptors()
+  {
+    return this.interceptorChain.getInterceptors();
+  }
+
+  public LanguageDriverRegistry getLanguageRegistry()
+  {
+    return this.languageRegistry;
+  }
+
+  public void setDefaultScriptingLanguage(Class<?> driver)
+  {
+    if (driver == null) {
+      driver = XMLLanguageDriver.class;
+    }
+    getLanguageRegistry().setDefaultDriverClass(driver);
+  }
+
+  public LanguageDriver getDefaultScriptingLanuageInstance()
+  {
+    return this.languageRegistry.getDefaultDriver();
+  }
+
+  public MetaObject newMetaObject(Object object)
+  {
+    return
+      MetaObject.forObject(object, this.objectFactory, this.objectWrapperFactory);
+  }
+
+  public ParameterHandler newParameterHandler(MappedStatement mappedStatement, Object parameterObject, BoundSql boundSql)
+  {
+    ParameterHandler parameterHandler = mappedStatement.getLang()
+      .createParameterHandler(mappedStatement, parameterObject,
+      boundSql);
+    parameterHandler = (ParameterHandler)this.interceptorChain
+      .pluginAll(parameterHandler);
+    return parameterHandler;
+  }
+
+  public ResultSetHandler newResultSetHandler(Executor executor, MappedStatement mappedStatement, RowBounds rowBounds, ParameterHandler parameterHandler, ResultHandler resultHandler, BoundSql boundSql)
+  {
+    ResultSetHandler resultSetHandler = new DefaultResultSetHandler(
+      executor, mappedStatement, parameterHandler, resultHandler,
+      boundSql, rowBounds);
+    resultSetHandler = (ResultSetHandler)this.interceptorChain
+      .pluginAll(resultSetHandler);
+    return resultSetHandler;
+  }
+
+  public StatementHandler newStatementHandler(Executor executor, MappedStatement mappedStatement, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql)
+  {
+    StatementHandler statementHandler = new RoutingStatementHandler(
+      executor, mappedStatement, parameterObject, rowBounds,
+      resultHandler, boundSql);
+    statementHandler = (StatementHandler)this.interceptorChain
+      .pluginAll(statementHandler);
+    return statementHandler;
+  }
+
+  public Executor newExecutor(Transaction transaction)
+  {
+    return newExecutor(transaction, this.defaultExecutorType);
+  }
+
+  public Executor newExecutor(Transaction transaction, ExecutorType executorType)
+  {
+    executorType = executorType == null ? this.defaultExecutorType :
+      executorType;
+    executorType = executorType == null ? ExecutorType.SIMPLE :
+      executorType;
+    Executor executor;
+    if (ExecutorType.BATCH == executorType)
+    {
+      executor = new BatchExecutor(this, transaction);
     }
     else
     {
-      SearchEndTime = end + " 23:59:59";
-    }
-    SysAdminUser sysUser = new SysAdminUser();
-    sysUser.setSearchStartTime(SearchStartTime);
-    sysUser.setSearchEndTime(SearchEndTime);
-    if ((SearchCondition != null) && (!"".equals(SearchCondition)))
-    {
-      sysUser.setUserName(MySqlUtils.specialStr(SearchCondition));
-      sysUser.setPhone(MySqlUtils.specialStr(SearchCondition));
-    }
-    Page<SysAdminUser> page = this.accountManagementService.findPage(new Page(request, response), sysUser);
-    System.out.println(page);
-    return ServerResponse.createBySuccess(page);
-  }
-
-  @RequestMapping({"findAllCooperativePartner"})
-  @ResponseBody
-  public ServerResponse findAllCooperativePartner(HttpServletRequest request, HttpServletResponse response)
-  {
-    String SearchCondition = request.getParameter("SearchCondition").trim();
-    String start = request.getParameter("SearchStartTime");
-    String SearchStartTime = null;
-    String end = request.getParameter("SearchEndTime");
-    String SearchEndTime = null;
-    if ((start == null) || ("".equals(start))) {
-      SearchStartTime = "1970-01-01 00:00:00";
-    } else {
-      SearchStartTime = start + " 00:00:00";
-    }
-    if ((end == null) || ("".equals(end)))
-    {
-      Date date = new Date();
-      SearchEndTime = DateUtils.formatDate(date, new Object[] { "yyyy-MM-dd" });
-      SearchEndTime = SearchEndTime + " 23:59:59";
-    }
-    else
-    {
-      SearchEndTime = end + " 23:59:59";
-    }
-    SysAdminUser sysUser = new SysAdminUser();
-    sysUser.setSearchStartTime(SearchStartTime);
-    sysUser.setSearchEndTime(SearchEndTime);
-    if ((SearchCondition != null) && (!"".equals(SearchCondition)))
-    {
-      sysUser.setUserName(MySqlUtils.specialStr(SearchCondition));
-      sysUser.setPhone(MySqlUtils.specialStr(SearchCondition));
-      sysUser.setCompanyName(MySqlUtils.specialStr(SearchCondition));
-    }
-    Page<SysAdminUser> page = this.accountManagementService
-      .findAllCooperativePartner(new Page(request, response), sysUser);
-    return ServerResponse.createBySuccess(page);
-  }
-
-  @RequestMapping({"findAllAccount"})
-  @ResponseBody
-  public ServerResponse findAllAccount(HttpServletRequest request, HttpServletResponse response)
-  {
-    String SearchCondition = request.getParameter("SearchCondition").trim();
-    String state = request.getParameter("state");
-    SysAdminUser sysUser = new SysAdminUser();
-    if ((state != null) && (!"".equals(state)))
-    {
-      if (state.equals("0")) {
-        sysUser.setState(Integer.valueOf(0));
-      }
-      if (state.equals("5")) {
-        sysUser.setState(Integer.valueOf(5));
-      }
-      if (state.equals("6")) {
-        sysUser.setState(Integer.valueOf(6));
+      Executor executor;
+      if (ExecutorType.REUSE == executorType) {
+        executor = new ReuseExecutor(this, transaction);
+      } else {
+        executor = new SimpleExecutor(this, transaction);
       }
     }
-    if ((SearchCondition != null) && (!"".equals(SearchCondition)))
-    {
-      sysUser.setUserName(MySqlUtils.specialStr(SearchCondition));
-      sysUser.setPhone(MySqlUtils.specialStr(SearchCondition));
+    if (this.cacheEnabled) {
+      executor = new CachingExecutor(executor);
     }
-    Page<SysAdminUser> page = this.accountManagementService.findAllAccount(new Page(request, response),
-      sysUser);
-    return ServerResponse.createBySuccess(page);
+    Executor executor = (Executor)this.interceptorChain.pluginAll(executor);
+    return executor;
   }
 
-  @RequestMapping({"/jumpToTrialAccount"})
-  public String TrialAccountDetail(Model model, Integer userId)
+  public void addKeyGenerator(String id, KeyGenerator keyGenerator)
   {
-    SysAdminUser sysUser = new SysAdminUser();
-    sysUser = this.sysAdminUserService.findInfoByUserId(userId.intValue());
-    String intentionTitle = "";
-    if ((sysUser.getIntention() != null) && (!sysUser.getIntention().equals("")))
-    {
-      String intention = sysUser.getIntention();
-      if (intention.length() > 1)
+    this.keyGenerators.put(id, keyGenerator);
+  }
+
+  public Collection<String> getKeyGeneratorNames()
+  {
+    return this.keyGenerators.keySet();
+  }
+
+  public Collection<KeyGenerator> getKeyGenerators()
+  {
+    return this.keyGenerators.values();
+  }
+
+  public KeyGenerator getKeyGenerator(String id)
+  {
+    return (KeyGenerator)this.keyGenerators.get(id);
+  }
+
+  public boolean hasKeyGenerator(String id)
+  {
+    return this.keyGenerators.containsKey(id);
+  }
+
+  public void addCache(Cache cache)
+  {
+    this.caches.put(cache.getId(), cache);
+  }
+
+  public Collection<String> getCacheNames()
+  {
+    return this.caches.keySet();
+  }
+
+  public Collection<Cache> getCaches()
+  {
+    return this.caches.values();
+  }
+
+  public Cache getCache(String id)
+  {
+    return (Cache)this.caches.get(id);
+  }
+
+  public boolean hasCache(String id)
+  {
+    return this.caches.containsKey(id);
+  }
+
+  public void addResultMap(ResultMap rm)
+  {
+    this.resultMaps.put(rm.getId(), rm);
+    checkLocallyForDiscriminatedNestedResultMaps(rm);
+    checkGloballyForDiscriminatedNestedResultMaps(rm);
+  }
+
+  public Collection<String> getResultMapNames()
+  {
+    return this.resultMaps.keySet();
+  }
+
+  public Collection<ResultMap> getResultMaps()
+  {
+    return this.resultMaps.values();
+  }
+
+  public ResultMap getResultMap(String id)
+  {
+    return (ResultMap)this.resultMaps.get(id);
+  }
+
+  public boolean hasResultMap(String id)
+  {
+    return this.resultMaps.containsKey(id);
+  }
+
+  public void addParameterMap(ParameterMap pm)
+  {
+    this.parameterMaps.put(pm.getId(), pm);
+  }
+
+  public Collection<String> getParameterMapNames()
+  {
+    return this.parameterMaps.keySet();
+  }
+
+  public Collection<ParameterMap> getParameterMaps()
+  {
+    return this.parameterMaps.values();
+  }
+
+  public ParameterMap getParameterMap(String id)
+  {
+    return (ParameterMap)this.parameterMaps.get(id);
+  }
+
+  public boolean hasParameterMap(String id)
+  {
+    return this.parameterMaps.containsKey(id);
+  }
+
+  public void addMappedStatement(MappedStatement ms)
+  {
+    this.mappedStatements.put(ms.getId(), ms);
+  }
+
+  public Collection<String> getMappedStatementNames()
+  {
+    buildAllStatements();
+    return this.mappedStatements.keySet();
+  }
+
+  public Collection<MappedStatement> getMappedStatements()
+  {
+    buildAllStatements();
+    return this.mappedStatements.values();
+  }
+
+  public Collection<XMLStatementBuilder> getIncompleteStatements()
+  {
+    return this.incompleteStatements;
+  }
+
+  public void addIncompleteStatement(XMLStatementBuilder incompleteStatement)
+  {
+    this.incompleteStatements.add(incompleteStatement);
+  }
+
+  public Collection<CacheRefResolver> getIncompleteCacheRefs()
+  {
+    return this.incompleteCacheRefs;
+  }
+
+  public void addIncompleteCacheRef(CacheRefResolver incompleteCacheRef)
+  {
+    this.incompleteCacheRefs.add(incompleteCacheRef);
+  }
+
+  public Collection<ResultMapResolver> getIncompleteResultMaps()
+  {
+    return this.incompleteResultMaps;
+  }
+
+  public void addIncompleteResultMap(ResultMapResolver resultMapResolver)
+  {
+    this.incompleteResultMaps.add(resultMapResolver);
+  }
+
+  public void addIncompleteMethod(MethodResolver builder)
+  {
+    this.incompleteMethods.add(builder);
+  }
+
+  public Collection<MethodResolver> getIncompleteMethods()
+  {
+    return this.incompleteMethods;
+  }
+
+  public MappedStatement getMappedStatement(String id)
+  {
+    return getMappedStatement(id, true);
+  }
+
+  public MappedStatement getMappedStatement(String id, boolean validateIncompleteStatements)
+  {
+    if (validateIncompleteStatements) {
+      buildAllStatements();
+    }
+    return (MappedStatement)this.mappedStatements.get(id);
+  }
+
+  public Map<String, XNode> getSqlFragments()
+  {
+    return this.sqlFragments;
+  }
+
+  public void addInterceptor(Interceptor interceptor)
+  {
+    this.interceptorChain.addInterceptor(interceptor);
+  }
+
+  public void addMappers(String packageName, Class<?> superType)
+  {
+    this.mapperRegistry.addMappers(packageName, superType);
+  }
+
+  public void addMappers(String packageName)
+  {
+    this.mapperRegistry.addMappers(packageName);
+  }
+
+  public <T> void addMapper(Class<T> type)
+  {
+    this.mapperRegistry.addMapper(type);
+  }
+
+  public <T> T getMapper(Class<T> type, SqlSession sqlSession)
+  {
+    return this.mapperRegistry.getMapper(type, sqlSession);
+  }
+
+  public boolean hasMapper(Class<?> type)
+  {
+    return this.mapperRegistry.hasMapper(type);
+  }
+
+  public boolean hasStatement(String statementName)
+  {
+    return hasStatement(statementName, true);
+  }
+
+  public boolean hasStatement(String statementName, boolean validateIncompleteStatements)
+  {
+    if (validateIncompleteStatements) {
+      buildAllStatements();
+    }
+    return this.mappedStatements.containsKey(statementName);
+  }
+
+  public void addCacheRef(String namespace, String referencedNamespace)
+  {
+    this.cacheRefMap.put(namespace, referencedNamespace);
+  }
+
+  protected void buildAllStatements()
+  {
+    if (!this.incompleteResultMaps.isEmpty()) {
+      synchronized (this.incompleteResultMaps)
       {
-        String[] str = intention.split(",");
-        for (int i = 0; i < str.length; i++)
+        ((ResultMapResolver)this.incompleteResultMaps.iterator().next()).resolve();
+      }
+    }
+    if (!this.incompleteCacheRefs.isEmpty()) {
+      synchronized (this.incompleteCacheRefs)
+      {
+        ((CacheRefResolver)this.incompleteCacheRefs.iterator().next()).resolveCacheRef();
+      }
+    }
+    if (!this.incompleteStatements.isEmpty()) {
+      synchronized (this.incompleteStatements)
+      {
+        ((XMLStatementBuilder)this.incompleteStatements.iterator().next()).parseStatementNode();
+      }
+    }
+    if (!this.incompleteMethods.isEmpty()) {
+      synchronized (this.incompleteMethods)
+      {
+        ((MethodResolver)this.incompleteMethods.iterator().next()).resolve();
+      }
+    }
+  }
+
+  protected String extractNamespace(String statementId)
+  {
+    int lastPeriod = statementId.lastIndexOf('.');
+    return lastPeriod > 0 ? statementId.substring(0, lastPeriod) : null;
+  }
+
+  protected void checkGloballyForDiscriminatedNestedResultMaps(ResultMap rm)
+  {
+    if (rm.hasNestedResultMaps()) {
+      for (Map.Entry<String, ResultMap> entry : this.resultMaps.entrySet())
+      {
+        Object value = entry.getValue();
+        if ((value instanceof ResultMap))
         {
-          int type = Integer.parseInt(str[i]);
-          if (type == 1) {
-            intentionTitle = intentionTitle + "炫店小程序";
-          } else if (type == 2) {
-            intentionTitle = intentionTitle + "、新版公众号";
-          } else if (type == 3) {
-            intentionTitle = intentionTitle + "、旧版公众号";
-          } else if (type == 4) {
-            intentionTitle = intentionTitle + "、炫销宝";
+          ResultMap entryResultMap = (ResultMap)value;
+          if ((!entryResultMap.hasNestedResultMaps()) &&
+            (entryResultMap.getDiscriminator() != null))
+          {
+            Collection<String> discriminatedResultMapNames = entryResultMap
+              .getDiscriminator().getDiscriminatorMap()
+              .values();
+            if (discriminatedResultMapNames.contains(rm.getId())) {
+              entryResultMap.forceNestedResultMaps();
+            }
           }
         }
-        if (intentionTitle.indexOf("炫店小程序") == -1) {
-          intentionTitle = intentionTitle.substring(1);
+      }
+    }
+  }
+
+  protected void checkLocallyForDiscriminatedNestedResultMaps(ResultMap rm)
+  {
+    if ((!rm.hasNestedResultMaps()) && (rm.getDiscriminator() != null))
+    {
+      Iterator localIterator = rm.getDiscriminator().getDiscriminatorMap().entrySet().iterator();
+      while (localIterator.hasNext())
+      {
+        Map.Entry<String, String> entry = (Map.Entry)localIterator.next();
+        String discriminatedResultMapName = (String)entry.getValue();
+        if (hasResultMap(discriminatedResultMapName))
+        {
+          ResultMap discriminatedResultMap =
+            (ResultMap)this.resultMaps.get(discriminatedResultMapName);
+          if (discriminatedResultMap.hasNestedResultMaps())
+          {
+            rm.forceNestedResultMaps();
+            break;
+          }
         }
       }
-      else if (Integer.parseInt(intention) == 1)
-      {
-        intentionTitle = intentionTitle + "炫店小程序";
-      }
-      else if (Integer.parseInt(intention) == 2)
-      {
-        intentionTitle = intentionTitle + "新版公众号";
-      }
-      else if (Integer.parseInt(intention) == 3)
-      {
-        intentionTitle = intentionTitle + "旧版公众号";
-      }
-      else if (Integer.parseInt(intention) == 4)
-      {
-        intentionTitle = intentionTitle + "炫销宝";
-      }
     }
-    model.addAttribute("intentionTitle", intentionTitle);
-    model.addAttribute("sysUser", sysUser);
-    return "modules/admin/ProbationerAccountManagementForm";
   }
 
-  @RequestMapping({"/jumpToCooperativePartner"})
-  public String CooperativePartnerDetail(Model model, Integer userId)
+  protected static class StrictMap<V>
+    extends HashMap<String, V>
   {
-    SysAdminUser sysUser = new SysAdminUser();
-    sysUser = this.sysAdminUserService.findInfoByUserId(userId.intValue());
-    model.addAttribute("sysUser", sysUser);
-    return "modules/admin/PartnerAccountManagementForm";
-  }
+    private static final long serialVersionUID = -4950446264854982944L;
+    private String name;
 
-  @RequestMapping({"updateInfo"})
-  @ResponseBody
-  public ServerResponse updateInfoByUserId(Integer userId)
-  {
-    return this.sysAdminUserService.updateInfoByUserId(userId.intValue());
-  }
-
-  @RequestMapping({"todo"})
-  @ResponseBody
-  public String todo(HttpServletRequest request, HttpServletResponse response)
-  {
-    String res = "1";
-
-    HttpSession session = request.getSession();
-    String sessionId = session.getId();
-    Integer sessionMapUserId = (Integer)AdminAuthonInterceptor.adminSessionMap.get(sessionId);
-    if (sessionMapUserId == null) {
-      return "-1";
-    }
-    Integer sessionUserId = (Integer)request.getSession().getAttribute("userId");
-
-    String Id = request.getParameter("activeUserId");
-    if ((Id != null) && (!"".equals(Id)))
+    public StrictMap(String name, int initialCapacity, float loadFactor)
     {
-      Integer activeUserId = Integer.valueOf(Id);
-      System.out.println("activeUserId:" + activeUserId);
-      if (activeUserId.intValue() != sessionUserId.intValue()) {
-        return "-1";
+      super(loadFactor);
+      this.name = name;
+    }
+
+    public StrictMap(String name, int initialCapacity)
+    {
+      super();
+      this.name = name;
+    }
+
+    public StrictMap(String name)
+    {
+      this.name = name;
+    }
+
+    public StrictMap(String name, Map<String, ? extends V> m)
+    {
+      super();
+      this.name = name;
+    }
+
+    public V put(String key, V value)
+    {
+      if (Runnable.isRefresh())
+      {
+        remove(key);
+        Runnable.log.debug("refresh key:" +
+          key.substring(key.lastIndexOf(".") + 1));
+      }
+      if (containsKey(key)) {
+        throw new IllegalArgumentException(this.name +
+          " already contains value for " + key);
+      }
+      if (key.contains("."))
+      {
+        String shortKey = getShortName(key);
+        if (super.get(shortKey) == null) {
+          super.put(shortKey, value);
+        } else {
+          super.put(shortKey, new Ambiguity(shortKey));
+        }
+      }
+      return super.put(key, value);
+    }
+
+    public V get(Object key)
+    {
+      V value = super.get(key);
+      if (value == null) {
+        throw new IllegalArgumentException(this.name +
+          " does not contain value for " + key);
+      }
+      if ((value instanceof Ambiguity)) {
+        throw new IllegalArgumentException(
+          ((Ambiguity)value).getSubject() +
+          " is ambiguous in " +
+          this.name +
+          " (try using the full name including the namespace, or rename one of the entries)");
+      }
+      return value;
+    }
+
+    private String getShortName(String key)
+    {
+      String[] keyparts = key.split("\\.");
+      String shortKey = keyparts[(keyparts.length - 1)];
+      return shortKey;
+    }
+
+    protected static class Ambiguity
+    {
+      private String subject;
+
+      public Ambiguity(String subject)
+      {
+        this.subject = subject;
+      }
+
+      public String getSubject()
+      {
+        return this.subject;
       }
     }
-    return res;
   }
 }

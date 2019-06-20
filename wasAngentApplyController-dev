@@ -1,418 +1,258 @@
-package com.jeeplus.modules.sys.web;
+package com.jeeplus.modules.admin.controller;
 
-import com.google.common.collect.Maps;
-import com.jeeplus.common.config.Global;
-import com.jeeplus.common.json.AjaxJson;
-import com.jeeplus.common.security.shiro.session.SessionDAO;
-import com.jeeplus.common.utils.CacheUtils;
-import com.jeeplus.common.utils.CookieUtils;
-import com.jeeplus.common.utils.IdGen;
-import com.jeeplus.common.utils.StringUtils;
+import com.jeeplus.common.persistence.Page;
+import com.jeeplus.common.utils.DateUtils;
 import com.jeeplus.common.web.BaseController;
-import com.jeeplus.modules.agentsystem.agency.entity.WasSysUser;
-import com.jeeplus.modules.agentsystem.agency.service.WasSysUserService;
-import com.jeeplus.modules.sys.dao.UserDao;
-import com.jeeplus.modules.sys.entity.User;
-import com.jeeplus.modules.sys.security.SystemAuthorizingRealm.Principal;
-import com.jeeplus.modules.sys.service.SystemService;
-import com.jeeplus.modules.sys.utils.UserUtils;
-import com.jeeplus.modules.tools.utils.ConfigurationFileHelper;
-import java.io.IOException;
+import com.jeeplus.modules.admin.common.ServerResponse;
+import com.jeeplus.modules.admin.entity.SysAdminUser;
+import com.jeeplus.modules.admin.service.AccountManagementService;
+import com.jeeplus.modules.admin.service.SysAdminUserService;
+import com.jeeplus.modules.sys.interceptor.AdminAuthonInterceptor;
+import com.jeeplus.modules.sys.utils.MySqlUtils;
 import java.io.PrintStream;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Collection;
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.authz.UnauthorizedException;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.apache.shiro.session.Session;
-import org.apache.shiro.subject.Subject;
-import org.apache.shiro.web.util.SavedRequest;
-import org.apache.shiro.web.util.WebUtils;
-import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
-public class LoginController
+@RequestMapping({"/admin/user"})
+public class AccountManagementController
   extends BaseController
 {
   @Autowired
-  private SessionDAO sessionDAO;
+  private AccountManagementService accountManagementService;
   @Autowired
-  private UserDao userDao;
-  @Autowired
-  private WasSysUserService wasSysUserService;
+  private SysAdminUserService sysAdminUserService;
 
-  @RequestMapping({"${adminPath}/login"})
-  public String login(HttpServletRequest request, HttpServletResponse response, Model model, WasSysUser wasSysUser)
-    throws IOException
+  @RequestMapping({"/jumpLeftMenu"})
+  public String jumpLeftMenu(HttpServletRequest request, HttpServletResponse response, Model model)
   {
-    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
-    if (this.logger.isDebugEnabled()) {
-      this.logger.debug("login, active session size: {}", Integer.valueOf(this.sessionDAO.getActiveSessions(false).size()));
-    }
-    boolean isGlobal = "true".equals(Global.getConfig("notAllowRefreshIndex"));
-    if (isGlobal) {
-      CookieUtils.setCookie(response, "LOGINED", "false");
-    }
-    if ((principal != null) && (!principal.isMobileLogin())) {
-      return "redirect:" + this.adminPath;
-    }
-    SavedRequest savedRequest = WebUtils.getSavedRequest(request);
-    if (savedRequest != null)
-    {
-      String queryStr = savedRequest.getQueryString();
-      boolean exitsed = (queryStr != null) && ((queryStr.contains("__ajax")) || (queryStr.contains("mobileLogin")));
-      if (exitsed)
-      {
-        AjaxJson j = new AjaxJson();
-        j.setSuccess(false);
-        j.setErrorCode("0");
-        j.setMsg("没有登录!");
-        return renderString(response, j);
-      }
-    }
-    return "redirect:" + this.backPath + "/a/login";
+    HttpSession session = request.getSession();
+
+    SysAdminUser sysAdminUser = (SysAdminUser)session.getAttribute("currentUser");
+    model.addAttribute("sysAdminUser", sysAdminUser);
+    return "modules/admin/accountManage";
   }
 
-  @RequestMapping({"${adminPath}/changePassword"})
-  public String changePassword(HttpServletRequest request, HttpServletResponse response, Model model)
-    throws IOException
+  @RequestMapping({"/jump"})
+  public String jump(HttpServletRequest request, HttpServletResponse response, Model model)
   {
-    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
-    String login_name = null;
-    if ((principal != null) && (!principal.isMobileLogin()))
-    {
-      login_name = principal.getLoginName().toString();
-      UserUtils.getSubject().logout();
-    }
-    model.addAttribute("login_name", login_name);
-    return "modules/sys/sysChangePassword";
+    return "modules/admin/ProbationerAccountManagementList";
   }
 
-  @RequestMapping({"${adminPath}/backLogin"})
-  public String backLogin(HttpServletRequest request, HttpServletResponse response)
+  @RequestMapping({"/jumpPartner"})
+  public String jumpPartner(HttpServletRequest request, HttpServletResponse response, Model model)
   {
-    return "modules/sys/sysLoginS";
+    return "modules/admin/PartnerAccountManagementList";
   }
 
+  @RequestMapping({"/jumpAccount"})
+  public String jumpAccount(HttpServletRequest request, HttpServletResponse response, Model model)
+  {
+    return "modules/admin/AccountManagementList";
+  }
+
+  @RequestMapping({"findAllTrialAccount"})
   @ResponseBody
-  @RequestMapping({"${adminPath}/affirmChange"})
-  public String affirmSave(HttpServletRequest request, HttpServletResponse response, RedirectAttributes redirectAttributes)
+  public ServerResponse findAllTrialAccount(HttpServletRequest request, HttpServletResponse response)
   {
-    String loginName = request.getParameter("loginName");
-    String oldPassword = request.getParameter("oldPassword");
-    String password = request.getParameter("changeNewPassword");
-    User user = (User)this.userDao.findUniqueByProperty("login_name", loginName);
-    UserUtils.clearCache(user);
-    Boolean result = Boolean.valueOf(SystemService.validatePassword(oldPassword, user.getPassword()));
-    if (!result.booleanValue()) {
-      return "validateFailure";
-    }
-    user.setPassword(SystemService.entryptPassword(password));
-    user.setUpdateDate(new Date());
-    int num = -1;
-    num = this.userDao.updatePasswordById(user);
-    if (num != -1)
-    {
-      UserUtils.getSubject().logout();
-      return "OK";
-    }
-    return "error";
-  }
-
-  @RequestMapping(value={"${adminPath}/login"}, method={org.springframework.web.bind.annotation.RequestMethod.POST})
-  public String loginFail(HttpServletRequest request, HttpServletResponse response, Model model, WasSysUser wasSysUser)
-  {
-    UserUtils.getSubject().logout();
-    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
-    if (principal != null) {
-      return "redirect:" + this.adminPath;
-    }
-    String username = WebUtils.getCleanParam(request, "username");
-    boolean rememberMe = WebUtils.isTrue(request, "rememberMe");
-    boolean mobile = WebUtils.isTrue(request, "mobileLogin");
-    String exception = (String)request.getAttribute("shiroLoginFailure");
-    String message = (String)request.getAttribute("message");
-
-
-
-
-    model.addAttribute("username", username);
-    model.addAttribute("rememberMe", Boolean.valueOf(rememberMe));
-    model.addAttribute("mobileLogin", Boolean.valueOf(mobile));
-    model.addAttribute("shiroLoginFailure", exception);
-    model.addAttribute("message", message);
-    if (this.logger.isDebugEnabled()) {
-      this.logger.debug("login fail, active session size: {}, message: {}, exception: {}", new Object[] {
-        Integer.valueOf(this.sessionDAO.getActiveSessions(false).size()), message, exception });
-    }
-    if (!UnauthorizedException.class.getName().equals(exception)) {
-      model.addAttribute("isValidateCodeLogin", Boolean.valueOf(isValidateCodeLogin(username, true, false)));
-    }
-    request.getSession().setAttribute("validateCode", IdGen.uuid());
-    if (mobile)
-    {
-      AjaxJson j = new AjaxJson();
-      j.setSuccess(false);
-      j.setMsg(message);
-      j.put("username", username);
-      j.put("name", "");
-      j.put("mobileLogin", Boolean.valueOf(mobile));
-      j.put("JSESSIONID", "");
-      return renderString(response, j.getJsonStr());
-    }
-    return "modules/sys/sysLoginS";
-  }
-
-  @RequestMapping(value={"${adminPath}/logout"}, method={org.springframework.web.bind.annotation.RequestMethod.GET})
-  public String logout(HttpServletRequest request, HttpServletResponse response, Model model)
-    throws IOException
-  {
-    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
-    if (principal != null) {
-      UserUtils.getSubject().logout();
-    }
-    String ajax = request.getParameter("__ajax");
-    if (ajax != null)
-    {
-      model.addAttribute("success", "1");
-      model.addAttribute("msg", "退出成功");
-      return renderString(response, model);
-    }
-    return "redirect:" + this.backPath + "/a/login";
-  }
-
-  @ResponseBody
-  @RequestMapping({"logOut"})
-  public void logOut(HttpServletRequest request)
-  {
-    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
-    if (principal != null) {
-      UserUtils.getSubject().logout();
-    }
-  }
-
-  @RequestMapping({"${adminPath}/checkJump"})
-  public String checkJump(HttpServletRequest request, HttpServletResponse response)
-  {
-    return "modules/agentsystem/agency/wasAgentLookUp";
-  }
-
-  public static int compare_date(String DATE1, String DATE2)
-  {
-    DateFormat df = new SimpleDateFormat("yyyy-MM-dd hh:mm");
-    try
-    {
-      Date dt1 = df.parse(DATE1);
-      Date dt2 = df.parse(DATE2);
-      if (dt1.getTime() > dt2.getTime()) {
-        return 1;
-      }
-      if (dt1.getTime() < dt2.getTime()) {
-        return -1;
-      }
-      return 0;
-    }
-    catch (Exception exception)
-    {
-      exception.printStackTrace();
-    }
-    return 0;
-  }
-
-  @RequiresPermissions({"user"})
-  @RequestMapping({"${adminPath}"})
-  public String index(HttpServletRequest request, HttpServletResponse response, WasSysUser wasSysUser, Model model)
-  {
-    SystemAuthorizingRealm.Principal principal = UserUtils.getPrincipal();
-    String login_name = principal.getLoginName().toString();
-    wasSysUser.setLogin_name(login_name);
-
-
-    Session sessionTwo = UserUtils.getSession();
-    String activeUserId = (String)sessionTwo.getAttribute("activeUserId");
-    System.err.println(activeUserId);
-    System.err.println(activeUserId);
-    System.err.println(activeUserId);
-    System.err.println(activeUserId);
-    System.err.println(activeUserId);
-
-
-    List<WasSysUser> list = this.wasSysUserService.agentLookUp(wasSysUser);
-    if (!"admin".equals(login_name))
-    {
-      SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd hh:mm");
-      Date dateO = new Date();
-      Date startDateO = ((WasSysUser)list.get(0)).getStartDate();
-      Date endDateO = ((WasSysUser)list.get(0)).getEndDate();
-      Integer state = ((WasSysUser)list.get(0)).getState();
-      String del_flag = ((WasSysUser)list.get(0)).getDelFlag();
-      String remarks = ((WasSysUser)list.get(0)).getRemarks();
-      if ("0".equals(del_flag))
-      {
-        if (state.intValue() == 0)
-        {
-          model.addAttribute("stateFlag", "1");
-          model.addAttribute("resultFlag", "账号已经冻结");
-          model.addAttribute("resultFlagReason", remarks);
-          Subject subject = SecurityUtils.getSubject();
-          subject.logout();
-          return "modules/sys/sysLoginS";
-        }
-        boolean stateApply = state.intValue() == 2;
-        if (stateApply)
-        {
-          model.addAttribute("resultFlag", "账号在申请中！");
-          Subject subject = SecurityUtils.getSubject();
-          subject.logout();
-          return "modules/sys/sysLoginS";
-        }
-        boolean stateReject = state.intValue() == 3;
-        if (stateReject)
-        {
-          model.addAttribute("stateFlag", "1");
-          model.addAttribute("resultFlagReason", remarks);
-          model.addAttribute("resultFlag", "账号已经驳回！");
-          Subject subject = SecurityUtils.getSubject();
-          subject.logout();
-          return "modules/sys/sysLoginS";
-        }
-        boolean stateNormal = state.intValue() == 1;
-        if ((stateNormal) &&
-          (startDateO != null) && (endDateO != null))
-        {
-          String date = FORMAT.format(dateO);
-          String startDate = FORMAT.format(startDateO);
-          String endDate = FORMAT.format(endDateO);
-          int resultS = compare_date(date, startDate);
-          int resultE = compare_date(endDate, date);
-          if (resultS < 0)
-          {
-            model.addAttribute("resultFlag", "账号还未开始！");
-            Subject subject = SecurityUtils.getSubject();
-            subject.logout();
-            return "modules/sys/sysLoginS";
-          }
-          if (resultE < 0)
-          {
-            model.addAttribute("resultFlag", "账号已过期！");
-            Subject subject = SecurityUtils.getSubject();
-            subject.logout();
-            return "modules/sys/sysLoginS";
-          }
-        }
-      }
-      else
-      {
-        model.addAttribute("resultFlag", "账号已被删除！");
-        Subject subject = SecurityUtils.getSubject();
-        subject.logout();
-        return "modules/sys/sysLoginS";
-      }
-    }
-    isValidateCodeLogin(principal.getLoginName(), false, true);
-    if (this.logger.isDebugEnabled()) {
-      this.logger.debug("show index, active session size: {}", Integer.valueOf(this.sessionDAO.getActiveSessions(false).size()));
-    }
-    boolean isGlobal = "true".equals(Global.getConfig("notAllowRefreshIndex"));
-    if (isGlobal)
-    {
-      String logined = CookieUtils.getCookie(request, "LOGINED");
-      boolean isLogin = (StringUtils.isBlank(logined)) || ("false".equals(logined));
-      boolean isLogined = StringUtils.equals(logined, "true");
-      if (isLogin)
-      {
-        CookieUtils.setCookie(response, "LOGINED", "true");
-      }
-      else if (isLogined)
-      {
-        UserUtils.getSubject().logout();
-        return "redirect:" + this.adminPath + "/login";
-      }
-    }
-    if (principal.isMobileLogin())
-    {
-      boolean loginSuccess = request.getParameter("login") != null;
-      boolean indexSuccess = request.getParameter("index") != null;
-      if (loginSuccess) {
-        return renderString(response, principal);
-      }
-      if (indexSuccess) {
-        return "modules/agentSystem/index";
-      }
-      return "redirect:" + this.adminPath + "/login";
-    }
-    String fileUrl = ConfigurationFileHelper.getFileUrl();
-    String savePath = ConfigurationFileHelper.getSavePath();
-
-    String loginName = principal.getLoginName();
-
-    String photo = "";
-    if ((((WasSysUser)list.get(0)).getPhoto() != null) && (!"".equals(((WasSysUser)list.get(0)).getPhoto().trim()))) {
-      photo = fileUrl + ((WasSysUser)list.get(0)).getPhoto();
-    }
-    Subject subject = SecurityUtils.getSubject();
-    Session session = subject.getSession();
-    session.setAttribute("vicmobAgentSystemUserName", principal.getLoginName());
-    session.setAttribute("vicmobAgentSystemUserPhoto", photo);
-    session.setAttribute("vicmobAgentSystemFileUrl", fileUrl);
-    session.setAttribute("vicmobAgentSystemSavePath", savePath);
-    session.setAttribute("vicmobAgentSystemLoginName", loginName);
-    session.setAttribute("activeUserId", activeUserId);
-    return "modules/agentsystem/index";
-  }
-
-  @RequestMapping({"/theme/{theme}"})
-  public String getThemeInCookie(@PathVariable String theme, HttpServletRequest request, HttpServletResponse response)
-  {
-    if (StringUtils.isNotBlank(theme)) {
-      CookieUtils.setCookie(response, "theme", theme);
+    String SearchCondition = request.getParameter("SearchCondition").trim();
+    String start = request.getParameter("SearchStartTime");
+    String SearchStartTime = null;
+    String end = request.getParameter("SearchEndTime");
+    String SearchEndTime = null;
+    if ((start == null) || ("".equals(start))) {
+      SearchStartTime = "1970-01-01 00:00:00";
     } else {
-      theme = CookieUtils.getCookie(request, "theme");
+      SearchStartTime = start + " 00:00:00";
     }
-    return "redirect:" + request.getParameter("url");
+    if ((end == null) || ("".equals(end)))
+    {
+      Date date = new Date();
+      SearchEndTime = DateUtils.formatDate(date, new Object[] { "yyyy-MM-dd" });
+      SearchEndTime = SearchEndTime + " 23:59:59";
+    }
+    else
+    {
+      SearchEndTime = end + " 23:59:59";
+    }
+    SysAdminUser sysUser = new SysAdminUser();
+    sysUser.setSearchStartTime(SearchStartTime);
+    sysUser.setSearchEndTime(SearchEndTime);
+    if ((SearchCondition != null) && (!"".equals(SearchCondition)))
+    {
+      sysUser.setUserName(MySqlUtils.specialStr(SearchCondition));
+      sysUser.setPhone(MySqlUtils.specialStr(SearchCondition));
+    }
+    Page<SysAdminUser> page = this.accountManagementService.findPage(new Page(request, response), sysUser);
+    System.out.println(page);
+    return ServerResponse.createBySuccess(page);
   }
 
-  public static boolean isValidateCodeLogin(String useruame, boolean isFail, boolean clean)
+  @RequestMapping({"findAllCooperativePartner"})
+  @ResponseBody
+  public ServerResponse findAllCooperativePartner(HttpServletRequest request, HttpServletResponse response)
   {
-    Map<String, Integer> loginFailMap = (Map)CacheUtils.get("loginFailMap");
-    if (loginFailMap == null)
+    String SearchCondition = request.getParameter("SearchCondition").trim();
+    String start = request.getParameter("SearchStartTime");
+    String SearchStartTime = null;
+    String end = request.getParameter("SearchEndTime");
+    String SearchEndTime = null;
+    if ((start == null) || ("".equals(start))) {
+      SearchStartTime = "1970-01-01 00:00:00";
+    } else {
+      SearchStartTime = start + " 00:00:00";
+    }
+    if ((end == null) || ("".equals(end)))
     {
-      loginFailMap = Maps.newHashMap();
-      CacheUtils.put("loginFailMap", loginFailMap);
+      Date date = new Date();
+      SearchEndTime = DateUtils.formatDate(date, new Object[] { "yyyy-MM-dd" });
+      SearchEndTime = SearchEndTime + " 23:59:59";
     }
-    Integer loginFailNum = (Integer)loginFailMap.get(useruame);
-    if (loginFailNum == null) {
-      loginFailNum = Integer.valueOf(0);
-    }
-    if (isFail)
+    else
     {
-      loginFailNum = Integer.valueOf(loginFailNum.intValue() + 1);
-      loginFailMap.put(useruame, loginFailNum);
+      SearchEndTime = end + " 23:59:59";
     }
-    if (clean) {
-      loginFailMap.remove(useruame);
+    SysAdminUser sysUser = new SysAdminUser();
+    sysUser.setSearchStartTime(SearchStartTime);
+    sysUser.setSearchEndTime(SearchEndTime);
+    if ((SearchCondition != null) && (!"".equals(SearchCondition)))
+    {
+      sysUser.setUserName(MySqlUtils.specialStr(SearchCondition));
+      sysUser.setPhone(MySqlUtils.specialStr(SearchCondition));
+      sysUser.setCompanyName(MySqlUtils.specialStr(SearchCondition));
     }
-    return loginFailNum.intValue() >= 3;
+    Page<SysAdminUser> page = this.accountManagementService
+      .findAllCooperativePartner(new Page(request, response), sysUser);
+    return ServerResponse.createBySuccess(page);
   }
 
-  @RequestMapping({"${adminPath}/home"})
-  public String home(HttpServletRequest request, HttpServletResponse response, Model model)
-    throws IOException
+  @RequestMapping({"findAllAccount"})
+  @ResponseBody
+  public ServerResponse findAllAccount(HttpServletRequest request, HttpServletResponse response)
   {
-    return "modules/sys/sysHome";
+    String SearchCondition = request.getParameter("SearchCondition").trim();
+    String state = request.getParameter("state");
+    SysAdminUser sysUser = new SysAdminUser();
+    if ((state != null) && (!"".equals(state)))
+    {
+      if (state.equals("0")) {
+        sysUser.setState(Integer.valueOf(0));
+      }
+      if (state.equals("5")) {
+        sysUser.setState(Integer.valueOf(5));
+      }
+      if (state.equals("6")) {
+        sysUser.setState(Integer.valueOf(6));
+      }
+    }
+    if ((SearchCondition != null) && (!"".equals(SearchCondition)))
+    {
+      sysUser.setUserName(MySqlUtils.specialStr(SearchCondition));
+      sysUser.setPhone(MySqlUtils.specialStr(SearchCondition));
+    }
+    Page<SysAdminUser> page = this.accountManagementService.findAllAccount(new Page(request, response),
+      sysUser);
+    return ServerResponse.createBySuccess(page);
+  }
+
+  @RequestMapping({"/jumpToTrialAccount"})
+  public String TrialAccountDetail(Model model, Integer userId)
+  {
+    SysAdminUser sysUser = new SysAdminUser();
+    sysUser = this.sysAdminUserService.findInfoByUserId(userId.intValue());
+    String intentionTitle = "";
+    if ((sysUser.getIntention() != null) && (!sysUser.getIntention().equals("")))
+    {
+      String intention = sysUser.getIntention();
+      if (intention.length() > 1)
+      {
+        String[] str = intention.split(",");
+        for (int i = 0; i < str.length; i++)
+        {
+          int type = Integer.parseInt(str[i]);
+          if (type == 1) {
+            intentionTitle = intentionTitle + "炫店小程序";
+          } else if (type == 2) {
+            intentionTitle = intentionTitle + "、新版公众号";
+          } else if (type == 3) {
+            intentionTitle = intentionTitle + "、旧版公众号";
+          } else if (type == 4) {
+            intentionTitle = intentionTitle + "、炫销宝";
+          }
+        }
+        if (intentionTitle.indexOf("炫店小程序") == -1) {
+          intentionTitle = intentionTitle.substring(1);
+        }
+      }
+      else if (Integer.parseInt(intention) == 1)
+      {
+        intentionTitle = intentionTitle + "炫店小程序";
+      }
+      else if (Integer.parseInt(intention) == 2)
+      {
+        intentionTitle = intentionTitle + "新版公众号";
+      }
+      else if (Integer.parseInt(intention) == 3)
+      {
+        intentionTitle = intentionTitle + "旧版公众号";
+      }
+      else if (Integer.parseInt(intention) == 4)
+      {
+        intentionTitle = intentionTitle + "炫销宝";
+      }
+    }
+    model.addAttribute("intentionTitle", intentionTitle);
+    model.addAttribute("sysUser", sysUser);
+    return "modules/admin/ProbationerAccountManagementForm";
+  }
+
+  @RequestMapping({"/jumpToCooperativePartner"})
+  public String CooperativePartnerDetail(Model model, Integer userId)
+  {
+    SysAdminUser sysUser = new SysAdminUser();
+    sysUser = this.sysAdminUserService.findInfoByUserId(userId.intValue());
+    model.addAttribute("sysUser", sysUser);
+    return "modules/admin/PartnerAccountManagementForm";
+  }
+
+  @RequestMapping({"updateInfo"})
+  @ResponseBody
+  public ServerResponse updateInfoByUserId(Integer userId)
+  {
+    return this.sysAdminUserService.updateInfoByUserId(userId.intValue());
+  }
+
+  @RequestMapping({"todo"})
+  @ResponseBody
+  public String todo(HttpServletRequest request, HttpServletResponse response)
+  {
+    String res = "1";
+
+    HttpSession session = request.getSession();
+    String sessionId = session.getId();
+    Integer sessionMapUserId = (Integer)AdminAuthonInterceptor.adminSessionMap.get(sessionId);
+    if (sessionMapUserId == null) {
+      return "-1";
+    }
+    Integer sessionUserId = (Integer)request.getSession().getAttribute("userId");
+
+    String Id = request.getParameter("activeUserId");
+    if ((Id != null) && (!"".equals(Id)))
+    {
+      Integer activeUserId = Integer.valueOf(Id);
+      System.out.println("activeUserId:" + activeUserId);
+      if (activeUserId.intValue() != sessionUserId.intValue()) {
+        return "-1";
+      }
+    }
+    return res;
   }
 }

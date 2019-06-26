@@ -6,7 +6,7 @@ set -e
 java_dir="/opt/java"
 java_tar="jdk-8u131-linux-x64.tar.gz"
 java_version="jdk1.8.0_131"
-java_home="${java_dir}/{java_version}"
+java_home="${java_dir}/${java_version}"
 
 #-e filename 如果 filename存在，则为真
 #-d filename 如果 filename为目录，则为真
